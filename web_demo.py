@@ -12,6 +12,7 @@ import pylab as plt
 from joblib import Parallel, delayed
 import util
 import torch
+import skvideo.io
 import torch as T
 import torch.nn as nn
 import torch.nn.functional as F
@@ -291,7 +292,7 @@ def handle_one(oriImg):
                         subset[j][-2] += candidate[partBs[i].astype(int), 2] + connection_all[k][i][2]
                 elif found == 2: # if found 2 and disjoint, merge them
                     j1, j2 = subset_idx
-                    print "found = 2"
+                    print ("found = 2")
                     membership = ((subset[j1]>=0).astype(int) + (subset[j2]>=0).astype(int))[:-2]
                     if len(np.nonzero(membership == 2)[0]) == 0: #merge
                         subset[j1][:-2] += (subset[j2][:-2] + 1)
@@ -319,12 +320,12 @@ def handle_one(oriImg):
             deleteIdx.append(i)
     subset = np.delete(subset, deleteIdx, axis=0)
 
-#    canvas = cv2.imread(test_image) # B,G,R order
-    for i in range(18):
+    # canvas = cv2.imread(test_image) # B,G,R order
+    for i in  [10, 13]:
         for j in range(len(all_peaks[i])):
             cv2.circle(canvas, all_peaks[i][j][0:2], 4, colors[i], thickness=-1)
-
     stickwidth = 4
+    return canvas
 
     for i in range(17):
         for n in range(len(subset)):
@@ -345,13 +346,24 @@ def handle_one(oriImg):
     return canvas
 
 if __name__ == "__main__":
-    print 'warming up'
-    _ = handle_one(np.ones((320,320,3)))
-
-    video_capture = cv2.VideoCapture("/home/payam/Downloads/videoplayback.mp4")
-    fourcc = cv2.VideoWriter_fourcc(*'XVID')
-    out_file = cv2.VideoWriter('data/output.avi',fourcc, 20.0, (360,480))
-    while True:
+    print ('warming up')
+    _ = handle_one(np.ones((540,960,3)))
+    writer = skvideo.io.FFmpegWriter(
+               "data/output.mp4",
+                inputdict = {
+                    '-r': str(20)
+                },
+                outputdict = {
+                    '-r': str(20)
+                }
+                )
+    video_capture = cv2.VideoCapture("/local_home/project/pytorch_Realtime_Multi-Person_Pose_Estimation/data/AVG-TownCentre.mp4")
+    # fourcc = cv2.VideoWriter_fourcc(*'XVID')
+    # out_file = cv2.VideoWriter('',fourcc, 20.0, (360,480))
+    counter = 22
+    # while True:
+    while video_capture.isOpened():
+        counter-=1
         start = time.clock()
 
         # Capture frame-by-frame
@@ -359,16 +371,16 @@ if __name__ == "__main__":
 
         canvas = handle_one(frame)
         # Display the resulting frame
-        print canvas.shape
-        out_file.write(canvas)
+        print (canvas.shape)
+        writer.writeFrame(canvas)
 
         cv2.imshow('Video', canvas)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
-        print 1.0/(time.clock() - start)
+        print (1.0/(time.clock() - start))
 
     # When everything is done, release the capture
-    out_file.release()
+    writer.close()
     video_capture.release()
     cv2.destroyAllWindows()
