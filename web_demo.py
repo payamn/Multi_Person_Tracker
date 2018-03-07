@@ -29,7 +29,7 @@ torch.set_num_threads(torch.get_num_threads())
 weight_name = './model/pose_model.pth'
 
 blocks = {}
-
+heat_map = np.zeros((540,960,3), np.uint8)
 # find connection in the specified sequence, center 29 is in the position 15
 limbSeq = [[2,3], [2,6], [3,4], [4,5], [6,7], [7,8], [2,9], [9,10], \
            [10,11], [2,12], [12,13], [13,14], [2,1], [1,15], [15,17], \
@@ -324,6 +324,7 @@ def handle_one(oriImg):
     for i in  [10, 13]:
         for j in range(len(all_peaks[i])):
             cv2.circle(canvas, all_peaks[i][j][0:2], 4, colors[i], thickness=-1)
+            cv2.circle(heat_map, all_peaks[i][j][0:2], 4, colors[i], thickness=-1)
     stickwidth = 4
     return canvas
 
@@ -375,6 +376,7 @@ if __name__ == "__main__":
         writer.writeFrame(canvas)
 
         cv2.imshow('Video', canvas)
+        cv2.imshow('HeatMap', heat_map)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
