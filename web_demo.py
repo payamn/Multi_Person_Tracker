@@ -28,8 +28,9 @@ from scipy.ndimage.filters import gaussian_filter
 torch.set_num_threads(torch.get_num_threads())
 weight_name = './model/pose_model.pth'
 
+# heat map r(in pixel) to generate each point in heat map
+RADIUS = 6
 blocks = {}
-heat_map = np.zeros((540,960,3), np.uint8)
 # find connection in the specified sequence, center 29 is in the position 15
 limbSeq = [[2,3], [2,6], [3,4], [4,5], [6,7], [7,8], [2,9], [9,10], \
            [10,11], [2,12], [12,13], [13,14], [2,1], [1,15], [15,17], \
@@ -146,8 +147,28 @@ model.eval()
 
 param_, model_ = config_reader()
 
+def euclideanDistance(center, point, radius):  # returns a float
+    distance = math.sqrt((float(center[0]) - point[0])**2 + (float(center[1]) - point[1])**2 )
+    print distance
+    if distance > radius:
+        return -1
+    else:
+        return distance
 
-def handle_one(oriImg):
+def heat_map_circle(image, point):
+    start_point = (max(point[0] - RADIUS, 0), max(point[1] - RADIUS, 0))
+    end_point = (min(point[0] + RADIUS, image.shape[1]-1), min(point[1] + RADIUS, image.shape[0]-1))
+    for x in range (start_point[0], end_point[0]+1):
+        for y in range (start_point[1], end_point[1]+1):
+            distance = euclideanDistance(point, (x,y), RADIUS)
+            if distance!= -1:
+                print ((x,y), point)
+                if (image[y, x, 0]<255):
+                    image[y, x, 0] += ((RADIUS-distance)/RADIUS)*4
+
+    return image
+
+def handle_one(oriImg, heat_map):
 
     # for visualize
     canvas = np.copy(oriImg)
@@ -324,9 +345,10 @@ def handle_one(oriImg):
     for i in  [10, 13]:
         for j in range(len(all_peaks[i])):
             cv2.circle(canvas, all_peaks[i][j][0:2], 4, colors[i], thickness=-1)
-            cv2.circle(heat_map, all_peaks[i][j][0:2], 4, colors[i], thickness=-1)
+            heat_map = heat_map_circle(heat_map, all_peaks[i][j][0:2])
+            # cv2.circle(heat_map, all_peaks[i][j][0:2], 4, colors[i], thickness=-1)
     stickwidth = 4
-    return canvas
+    return canvas, heat_map
 
     for i in range(17):
         for n in range(len(subset)):
@@ -348,21 +370,34 @@ def handle_one(oriImg):
 
 if __name__ == "__main__":
     print ('warming up')
-    _ = handle_one(np.ones((540,960,3)))
-    writer = skvideo.io.FFmpegWriter(
-               "data/output.mp4",
-                inputdict = {
-                    '-r': str(20)
-                },
-                outputdict = {
-                    '-r': str(20)
-                }
-                )
-    video_capture = cv2.VideoCapture("/local_home/project/pytorch_Realtime_Multi-Person_Pose_Estimation/data/AVG-TownCentre.mp4")
+    writer_open_pose = skvideo.io.FFmpegWriter(
+       "data/output.mp4",
+        inputdict = {
+            '-r': str(20)
+        },
+        outputdict = {
+            '-r': str(20)
+        }
+    )
+    writer_heat_map = skvideo.io.FFmpegWriter(
+        "data/heat_map.mp4",
+        inputdict={
+            '-r': str(20)
+        },
+        outputdict={
+            '-r': str(20)
+        }
+    )
+    video_capture = cv2.VideoCapture("/local_home/project/pytorch_Realtime_Multi-Person_Pose_Estimation/data/PETS09-S2L1.mp4")
     # fourcc = cv2.VideoWriter_fourcc(*'XVID')
     # out_file = cv2.VideoWriter('',fourcc, 20.0, (360,480))
     counter = 22
+    ret, frame = video_capture.read()
     # while True:
+    heat_map = np.zeros((frame.shape[0], frame.shape[1],1), np.uint8)
+    _ = handle_one(np.ones((540,960,3)), heat_map)
+
+
     while video_capture.isOpened():
         counter-=1
         start = time.clock()
@@ -370,19 +405,38 @@ if __name__ == "__main__":
         # Capture frame-by-frame
         ret, frame = video_capture.read()
 
-        canvas = handle_one(frame)
+        canvas, heat_map = handle_one(frame, heat_map)
         # Display the resulting frame
         print (canvas.shape)
-        writer.writeFrame(canvas)
+        writer_open_pose.writeFrame(canvas)
+        im_color = cv2.applyColorMap(heat_map, cv2.COLORMAP_HOT)
+        # cv2.imshow('Video', canvas)
+        # cv2.imshow('HeatMap', im_color)
 
-        cv2.imshow('Video', canvas)
-        cv2.imshow('HeatMap', heat_map)
+        alpha = np.ones(im_color.shape, np.uint8)
 
+        # Normalize the alpha mask to keep intensity between 0 and 1
+        # alpha = alpha.astype(float) / 255
+
+        # Multiply the foreground with the alpha matte
+
+        # canvasbgr = cv2.cvtColor(canvas,cv2.COLOR_RGB2BGR)
+        for i in range(im_color.shape[0]):
+            for j in range(im_color.shape[1]):
+                if (heat_map[i,j,0]==0):
+                    alpha[i,j] =canvas[i,j]
+                else:
+                    alpha[i,j] = im_color[i,j]
+
+        writer_heat_map.writeFrame(cv2.cvtColor(alpha,cv2.COLOR_BGR2RGB))
+
+        cv2.imshow("combine", alpha)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
         print (1.0/(time.clock() - start))
 
     # When everything is done, release the capture
-    writer.close()
+    writer_open_pose.close()
+    writer_heat_map.close()
     video_capture.release()
     cv2.destroyAllWindows()
