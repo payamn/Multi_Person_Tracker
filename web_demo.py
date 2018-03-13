@@ -20,16 +20,18 @@ from torch.autograd import Variable
 from collections import OrderedDict
 from config_reader import config_reader
 from scipy.ndimage.filters import gaussian_filter
+from tracker import tracker
 #parser = argparse.ArgumentParser()
 #parser.add_argument('--t7_file', required=True)
 #parser.add_argument('--pth_file', required=True)
 #args = parser.parse_args()
 
+TRACK_TYPE = "TLD"
 torch.set_num_threads(torch.get_num_threads())
 weight_name = './model/pose_model.pth'
 
 # heat map r(in pixel) to generate each point in heat map
-RADIUS = 6
+RADIUS = 10
 blocks = {}
 # find connection in the specified sequence, center 29 is in the position 15
 limbSeq = [[2,3], [2,6], [3,4], [4,5], [6,7], [7,8], [2,9], [9,10], \
@@ -44,7 +46,7 @@ mapIdx = [[31,32], [39,40], [33,34], [35,36], [41,42], [43,44], [19,20], [21,22]
 # visualize
 colors = [[255, 0, 0], [255, 85, 0], [255, 170, 0], [255, 255, 0], [170, 255, 0], [85, 255, 0], [0, 255, 0], \
           [0, 255, 85], [0, 255, 170], [0, 255, 255], [0, 170, 255], [0, 85, 255], [0, 0, 255], [85, 0, 255], \
-          [170, 0, 255], [255, 0, 255], [255, 0, 170], [255, 0, 85]]
+          [170, 0, 255], [255, 0, 255], [255, 0, 170], [255, 0, 85], [150, 10, 85], [100, 60, 85]]
 
 
 block0  = [{'conv1_1':[3,64,3,1,1]},{'conv1_2':[64,64,3,1,1]},{'pool1_stage1':[2,2,0]},{'conv2_1':[64,128,3,1,1]},{'conv2_2':[128,128,3,1,1]},{'pool2_stage1':[2,2,0]},{'conv3_1':[128,256,3,1,1]},{'conv3_2':[256,256,3,1,1]},{'conv3_3':[256,256,3,1,1]},{'conv3_4':[256,256,3,1,1]},{'pool3_stage1':[2,2,0]},{'conv4_1':[256,512,3,1,1]},{'conv4_2':[512,512,3,1,1]},{'conv4_3_CPM':[512,256,3,1,1]},{'conv4_4_CPM':[256,128,3,1,1]}]
@@ -149,24 +151,28 @@ param_, model_ = config_reader()
 
 def euclideanDistance(center, point, radius):  # returns a float
     distance = math.sqrt((float(center[0]) - point[0])**2 + (float(center[1]) - point[1])**2 )
-    print distance
     if distance > radius:
         return -1
     else:
         return distance
 
-def heat_map_circle(image, point):
-    start_point = (max(point[0] - RADIUS, 0), max(point[1] - RADIUS, 0))
-    end_point = (min(point[0] + RADIUS, image.shape[1]-1), min(point[1] + RADIUS, image.shape[0]-1))
+def heat_map_circle(image, point_center):
+    start_point = (max(point_center[0] - RADIUS, 0), max(point_center[1] - RADIUS, 0))
+    end_point = (min(point_center[0] + RADIUS, image.shape[1]-1), min(point_center[1] + RADIUS, image.shape[0]-1))
     for x in range (start_point[0], end_point[0]+1):
         for y in range (start_point[1], end_point[1]+1):
-            distance = euclideanDistance(point, (x,y), RADIUS)
+            distance = euclideanDistance(point_center, (x,y), RADIUS)
             if distance!= -1:
-                print ((x,y), point)
-                if (image[y, x, 0]<255):
-                    image[y, x, 0] += ((RADIUS-distance)/RADIUS)*4
+                if (image[y, x, 0]+((RADIUS-distance)/RADIUS)*200<255):
+                    image[y, x, 0] += ((RADIUS-distance)/RADIUS)*200
+                else:
+                    image[y, x, 0] = 255
 
     return image
+
+def get_center(point1, point2):
+    return tuple([x / 2 for x in map(sum, zip(point1, point2))])
+
 
 def handle_one(oriImg, heat_map):
 
@@ -335,40 +341,99 @@ def handle_one(oriImg, heat_map):
                     subset = np.vstack([subset, row])
 
     # delete some rows of subset which has few parts occur
-    deleteIdx = [];
+    deleteIdx = []
     for i in range(len(subset)):
         if subset[i][-1] < 4 or subset[i][-2]/subset[i][-1] < 0.4:
             deleteIdx.append(i)
     subset = np.delete(subset, deleteIdx, axis=0)
 
-    # canvas = cv2.imread(test_image) # B,G,R order
-    for i in  [10, 13]:
-        for j in range(len(all_peaks[i])):
-            cv2.circle(canvas, all_peaks[i][j][0:2], 4, colors[i], thickness=-1)
-            heat_map = heat_map_circle(heat_map, all_peaks[i][j][0:2])
-            # cv2.circle(heat_map, all_peaks[i][j][0:2], 4, colors[i], thickness=-1)
-    stickwidth = 4
-    return canvas, heat_map
+    # for i in range 17:
+    #     for j in range(len(all_peaks[10])):
 
-    for i in range(17):
-        for n in range(len(subset)):
-            index = subset[n][np.array(limbSeq[i])-1]
+    # canvas = cv2.imread(test_image) # B,G,R order
+    # for i in  [10, 13]:
+    # for j in range(len(all_peaks[10])):
+        # cv2.circle(canvas, all_peaks[i][j][0:2], 4, colors[i], thickness=-1)
+        # if len(all_peaks[13]) >= j:
+            # center = get_center(all_peaks[10][j][0:2], all_peaks[13][j][0:2])
+
+            # heat_map = heat_map_circle(heat_map, center)
+            # cv2.circle(canvas, center, 4, colors[0], thickness=-1)
+            # cv2.circle(canvas, all_peaks[10][j][0:2], 4, colors[2], thickness=-1)
+            #
+            # cv2.circle(canvas, all_peaks[13][j][0:2], 4, colors[3], thickness=-1)
+    stickwidth = 4
+    track_list = []
+    # return canvas, heat_map
+    for n in range(len(subset)):
+        person_points = []
+        for i in range(19):
+            # for i in [7,8,10,11]:
+            index = subset[n][np.array(limbSeq[i]) - 1]
             if -1 in index:
                 continue
-            cur_canvas = canvas.copy()
             Y = candidate[index.astype(int), 0]
             X = candidate[index.astype(int), 1]
             mX = np.mean(X)
             mY = np.mean(Y)
+            cur_canvas = canvas.copy()
             length = ((X[0] - X[1]) ** 2 + (Y[0] - Y[1]) ** 2) ** 0.5
             angle = math.degrees(math.atan2(X[0] - X[1], Y[0] - Y[1]))
             polygon = cv2.ellipse2Poly((int(mY),int(mX)), (int(length/2), stickwidth), int(angle), 0, 360, 1)
             cv2.fillConvexPoly(cur_canvas, polygon, colors[i])
             canvas = cv2.addWeighted(canvas, 0.4, cur_canvas, 0.6, 0)
+            person_points.extend([(Y[0],X[0]), (Y[1],X[1])])
+        bounding_box = find_person_bounding_box(person_points)
+        track_list.append(tracker(TRACK_TYPE,bounding_box,canvas))
+    # for i in range(19):
+    # for i in [7,8,10,11]:
+    #     for n in range(len(subset)):
+    #         index = subset[n][np.array(limbSeq[i])-1]
+    #         if -1 in index:
+    #             continue
+    #         # cur_canvas = canvas.copy()
+    #         # Y = candidate[index.astype(int), 0]
+    #         # X = candidate[index.astype(int), 1]
+    #         # mX = np.mean(X)
+    #         # mY = np.mean(Y)
+    #         # length = ((X[0] - X[1]) ** 2 + (Y[0] - Y[1]) ** 2) ** 0.5
+    #         # angle = math.degrees(math.atan2(X[0] - X[1], Y[0] - Y[1]))
+    #         # polygon = cv2.ellipse2Poly((int(mY),int(mX)), (int(length/2), stickwidth), int(angle), 0, 360, 1)
+    #         # cv2.fillConvexPoly(cur_canvas, polygon, colors[i])
+    #         canvas = cv2.addWeighted(canvas, 0.4, cur_canvas, 0.6, 0)
 
-    return canvas
+    return canvas, heat_map, track_list
+
+def find_person_bounding_box(points):
+    """
+
+    :param points: all the points for person joints
+    :return: bounding box for a person
+    """
+    max_point = (0,0)
+    min_point = (10000,10000)
+    for point in points:
+        max_point = (int(max(point[0], max_point[0])), int(max(point[1], max_point[1])))
+        min_point = (int(min(point[0], min_point[0])), int(min(point[1], min_point[1])))
+    # cv2.rectangle(canvas, min_point, max_point, [255, 0, 0])
+    # cv2.imwrite('messigray.png', canvas)
+    return (min_point + max_point)
+
+def visualize_person(canvas, bounding_box):
+    """
+
+    :param canvas: image
+    :param points: bounding_box for visualizing the person
+    """
+    cv2.rectangle(canvas, bounding_box, [255, 0, 0])
+    # cv2.imwrite('messigray.png', canvas)
+    # return (min_point + max_point)
+
+
+
 
 if __name__ == "__main__":
+
     print ('warming up')
     writer_open_pose = skvideo.io.FFmpegWriter(
        "data/output.mp4",
@@ -388,7 +453,7 @@ if __name__ == "__main__":
             '-r': str(20)
         }
     )
-    video_capture = cv2.VideoCapture("/local_home/project/pytorch_Realtime_Multi-Person_Pose_Estimation/data/PETS09-S2L1.mp4")
+    video_capture = cv2.VideoCapture("/local_home/project/pytorch_Realtime_Multi-Person_Pose_Estimation/data/AVG-TownCentre.mp4")
     # fourcc = cv2.VideoWriter_fourcc(*'XVID')
     # out_file = cv2.VideoWriter('',fourcc, 20.0, (360,480))
     counter = 22
@@ -398,6 +463,11 @@ if __name__ == "__main__":
     _ = handle_one(np.ones((540,960,3)), heat_map)
 
 
+    # to be removed
+    ret, frame = video_capture.read()
+
+    canvas, heat_map, track_list = handle_one(frame, heat_map)
+
     while video_capture.isOpened():
         counter-=1
         start = time.clock()
@@ -405,9 +475,8 @@ if __name__ == "__main__":
         # Capture frame-by-frame
         ret, frame = video_capture.read()
 
-        canvas, heat_map = handle_one(frame, heat_map)
+        canvas, heat_map, track_list = handle_one(frame, heat_map)
         # Display the resulting frame
-        print (canvas.shape)
         writer_open_pose.writeFrame(canvas)
         im_color = cv2.applyColorMap(heat_map, cv2.COLORMAP_HOT)
         # cv2.imshow('Video', canvas)
@@ -423,17 +492,19 @@ if __name__ == "__main__":
         # canvasbgr = cv2.cvtColor(canvas,cv2.COLOR_RGB2BGR)
         for i in range(im_color.shape[0]):
             for j in range(im_color.shape[1]):
-                if (heat_map[i,j,0]==0):
-                    alpha[i,j] =canvas[i,j]
-                else:
-                    alpha[i,j] = im_color[i,j]
+                alpha[i, j] = (im_color[i,j]+ canvas[i,j])/2
+                # if (heat_map[i,j,0]==0):
+                #     alpha[i,j] =canvas[i,j]
+                # else:
+                #     alpha[i,j] = im_color[i,j]
 
         writer_heat_map.writeFrame(cv2.cvtColor(alpha,cv2.COLOR_BGR2RGB))
+        cv2.imshow("color", im_color)
 
         cv2.imshow("combine", alpha)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
-        print (1.0/(time.clock() - start))
+        # print (1.0/(time.clock() - start))
 
     # When everything is done, release the capture
     writer_open_pose.close()
