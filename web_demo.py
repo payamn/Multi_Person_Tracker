@@ -417,7 +417,8 @@ def find_person_bounding_box(points):
         min_point = (int(min(point[0], min_point[0])), int(min(point[1], min_point[1])))
     # cv2.rectangle(canvas, min_point, max_point, [255, 0, 0])
     # cv2.imwrite('messigray.png', canvas)
-    return (min_point + max_point)
+    # return (0,1,1,3)
+    return (0,1,1,3)
 
 def visualize_person(canvas, bounding_box):
     """
@@ -471,18 +472,21 @@ if __name__ == "__main__":
     while video_capture.isOpened():
         counter-=1
         start = time.clock()
-
-        # Capture frame-by-frame
         ret, frame = video_capture.read()
 
-        canvas, heat_map, track_list = handle_one(frame, heat_map)
+        for track in track_list[0:1]:
+            track.update(frame)
+        # Capture frame-by-frame
+        # ret, frame = video_capture.read()
+        #
+        # canvas, heat_map, track_list = handle_one(frame, heat_map)
         # Display the resulting frame
-        writer_open_pose.writeFrame(canvas)
-        im_color = cv2.applyColorMap(heat_map, cv2.COLORMAP_HOT)
+        # writer_open_pose.writeFrame(canvas)
+        # im_color = cv2.applyColorMap(heat_map, cv2.COLORMAP_HOT)
         # cv2.imshow('Video', canvas)
         # cv2.imshow('HeatMap', im_color)
 
-        alpha = np.ones(im_color.shape, np.uint8)
+        # alpha = np.ones(im_color.shape, np.uint8)
 
         # Normalize the alpha mask to keep intensity between 0 and 1
         # alpha = alpha.astype(float) / 255
@@ -490,18 +494,18 @@ if __name__ == "__main__":
         # Multiply the foreground with the alpha matte
 
         # canvasbgr = cv2.cvtColor(canvas,cv2.COLOR_RGB2BGR)
-        for i in range(im_color.shape[0]):
-            for j in range(im_color.shape[1]):
-                alpha[i, j] = (im_color[i,j]+ canvas[i,j])/2
+        # for i in range(im_color.shape[0]):
+        #     for j in range(im_color.shape[1]):
+        #         alpha[i, j] = (im_color[i,j]+ canvas[i,j])/2
                 # if (heat_map[i,j,0]==0):
                 #     alpha[i,j] =canvas[i,j]
                 # else:
                 #     alpha[i,j] = im_color[i,j]
 
-        writer_heat_map.writeFrame(cv2.cvtColor(alpha,cv2.COLOR_BGR2RGB))
-        cv2.imshow("color", im_color)
+        # writer_heat_map.writeFrame(cv2.cvtColor(alpha,cv2.COLOR_BGR2RGB))
+        # cv2.imshow("color", im_color)
 
-        cv2.imshow("combine", alpha)
+        cv2.imshow("canvas", frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
         # print (1.0/(time.clock() - start))

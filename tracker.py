@@ -15,7 +15,7 @@ class tracker ():
             self.tracker = cv2.TrackerMedianFlow_create()
         if tracker_type == 'GOTURN':
             self.tracker = cv2.TrackerGOTURN_create()
-        self._is_success = self.tracker.init(frame, bounding_box)
+        self._is_success = self.tracker.init(frame, bounding_box, )
         self._prev_frame = frame
         self._bounding_box = bounding_box
     def update(self, frame, bounding_box=None):
@@ -29,6 +29,7 @@ class tracker ():
             self._bounding_box = bounding_box
 
         self._is_success, self._bounding_box = tracker.update(frame)
+        self.visualize(frame)
         return self._is_success, self._bounding_box
     def visualize(self, frame):
         if self._is_success:
