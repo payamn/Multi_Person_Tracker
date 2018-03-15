@@ -365,6 +365,10 @@ def handle_one(oriImg, heat_map):
     stickwidth = 4
     track_list = []
     # return canvas, heat_map
+    # while True:
+    #     bbox = cv2.selectROI("tracker", canvas)
+    #     print bbox
+
     for n in range(len(subset)):
         person_points = []
         for i in range(19):
@@ -418,7 +422,7 @@ def find_person_bounding_box(points):
     # cv2.rectangle(canvas, min_point, max_point, [255, 0, 0])
     # cv2.imwrite('messigray.png', canvas)
     # return (0,1,1,3)
-    return (0,1,1,3)
+    return (min_point[0], min_point[1], max_point[0] - min_point[0], max_point[1] - min_point[1])
 
 def visualize_person(canvas, bounding_box):
     """
@@ -461,7 +465,7 @@ if __name__ == "__main__":
     ret, frame = video_capture.read()
     # while True:
     heat_map = np.zeros((frame.shape[0], frame.shape[1],1), np.uint8)
-    _ = handle_one(np.ones((540,960,3)), heat_map)
+    # _ = handle_one(np.ones((540,960,3)), heat_map)
 
 
     # to be removed
@@ -472,10 +476,13 @@ if __name__ == "__main__":
     while video_capture.isOpened():
         counter-=1
         start = time.clock()
-        ret, frame = video_capture.read()
-
-        for track in track_list[0:1]:
+        print ("before track")
+        for track in track_list[2:5]:
             track.update(frame)
+            print ("in track")
+        print ("after track")
+        for track in track_list:
+            track.visualize(frame)
         # Capture frame-by-frame
         # ret, frame = video_capture.read()
         #
@@ -506,9 +513,11 @@ if __name__ == "__main__":
         # cv2.imshow("color", im_color)
 
         cv2.imshow("canvas", frame)
+        ret, frame = video_capture.read()
+
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
-        # print (1.0/(time.clock() - start))
+        print (1.0/(time.clock() - start))
 
     # When everything is done, release the capture
     writer_open_pose.close()
