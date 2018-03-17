@@ -1,4 +1,5 @@
-model/*
+model/_trained*
+model/pose_model.pth
 *.pyc
 data/*
 .idea/*
