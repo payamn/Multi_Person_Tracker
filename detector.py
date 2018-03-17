@@ -174,7 +174,7 @@ def get_center(point1, point2):
     return tuple([x / 2 for x in map(sum, zip(point1, point2))])
 
 
-def handle_one(oriImg, heat_map):
+def handle_one(oriImg):
 
     # for visualize
     canvas = np.copy(oriImg)
@@ -390,7 +390,6 @@ def handle_one(oriImg, heat_map):
         bounding_box = find_person_bounding_box(person_points)
         track_list.append(tracker(TRACK_TYPE,bounding_box,canvas))
     # for i in range(19):
-    # for i in [7,8,10,11]:
     #     for n in range(len(subset)):
     #         index = subset[n][np.array(limbSeq[i])-1]
     #         if -1 in index:
@@ -406,7 +405,7 @@ def handle_one(oriImg, heat_map):
     #         # cv2.fillConvexPoly(cur_canvas, polygon, colors[i])
     #         canvas = cv2.addWeighted(canvas, 0.4, cur_canvas, 0.6, 0)
 
-    return canvas, heat_map, track_list
+    return canvas, track_list
 
 def find_person_bounding_box(points):
     """
@@ -422,7 +421,7 @@ def find_person_bounding_box(points):
     # cv2.rectangle(canvas, min_point, max_point, [255, 0, 0])
     # cv2.imwrite('messigray.png', canvas)
     # return (0,1,1,3)
-    return (min_point[0], min_point[1], max_point[0] - min_point[0], max_point[1] - min_point[1])
+    return (min_point[0], min_point[1], max_point[0] , max_point[1] )
 
 def visualize_person(canvas, bounding_box):
     """
@@ -434,93 +433,3 @@ def visualize_person(canvas, bounding_box):
     # cv2.imwrite('messigray.png', canvas)
     # return (min_point + max_point)
 
-
-
-
-if __name__ == "__main__":
-
-    print ('warming up')
-    writer_open_pose = skvideo.io.FFmpegWriter(
-       "data/output.mp4",
-        inputdict = {
-            '-r': str(20)
-        },
-        outputdict = {
-            '-r': str(20)
-        }
-    )
-    writer_heat_map = skvideo.io.FFmpegWriter(
-        "data/heat_map.mp4",
-        inputdict={
-            '-r': str(20)
-        },
-        outputdict={
-            '-r': str(20)
-        }
-    )
-    video_capture = cv2.VideoCapture("/local_home/project/pytorch_Realtime_Multi-Person_Pose_Estimation/data/AVG-TownCentre.mp4")
-    # fourcc = cv2.VideoWriter_fourcc(*'XVID')
-    # out_file = cv2.VideoWriter('',fourcc, 20.0, (360,480))
-    counter = 22
-    ret, frame = video_capture.read()
-    # while True:
-    heat_map = np.zeros((frame.shape[0], frame.shape[1],1), np.uint8)
-    # _ = handle_one(np.ones((540,960,3)), heat_map)
-
-
-    # to be removed
-    ret, frame = video_capture.read()
-
-    canvas, heat_map, track_list = handle_one(frame, heat_map)
-
-    while video_capture.isOpened():
-        counter-=1
-        start = time.clock()
-        print ("before track")
-        for track in track_list:
-            track.update(frame)
-            print ("in track")
-        print ("after track")
-        for track in track_list:
-            track.visualize(frame)
-        # Capture frame-by-frame
-        # ret, frame = video_capture.read()
-        #
-        # canvas, heat_map, track_list = handle_one(frame, heat_map)
-        # Display the resulting frame
-        # writer_open_pose.writeFrame(canvas)
-        # im_color = cv2.applyColorMap(heat_map, cv2.COLORMAP_HOT)
-        # cv2.imshow('Video', canvas)
-        # cv2.imshow('HeatMap', im_color)
-
-        # alpha = np.ones(im_color.shape, np.uint8)
-
-        # Normalize the alpha mask to keep intensity between 0 and 1
-        # alpha = alpha.astype(float) / 255
-
-        # Multiply the foreground with the alpha matte
-
-        # canvasbgr = cv2.cvtColor(canvas,cv2.COLOR_RGB2BGR)
-        # for i in range(im_color.shape[0]):
-        #     for j in range(im_color.shape[1]):
-        #         alpha[i, j] = (im_color[i,j]+ canvas[i,j])/2
-                # if (heat_map[i,j,0]==0):
-                #     alpha[i,j] =canvas[i,j]
-                # else:
-                #     alpha[i,j] = im_color[i,j]
-
-        # writer_heat_map.writeFrame(cv2.cvtColor(alpha,cv2.COLOR_BGR2RGB))
-        # cv2.imshow("color", im_color)
-
-        cv2.imshow("canvas", frame)
-        ret, frame = video_capture.read()
-
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-        print (1.0/(time.clock() - start))
-
-    # When everything is done, release the capture
-    writer_open_pose.close()
-    writer_heat_map.close()
-    video_capture.release()
-    cv2.destroyAllWindows()

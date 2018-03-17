@@ -2,3 +2,4 @@ model/*
 *.pyc
 data/*
 .idea/*
+output/*

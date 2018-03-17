@@ -17,7 +17,9 @@ class tracker ():
             self.tracker = cv2.TrackerGOTURN_create()
         self.is_init = False
         self._bounding_box = bounding_box
-        self.rectangle = None
+        p1 = (int(self._bounding_box[0]), int(self._bounding_box[1]))
+        p2 = (int(self._bounding_box[0] + self._bounding_box[2]), int(self._bounding_box[1] + self._bounding_box[3]))
+        self.rectangle = (p1, p2)
 
     def update(self, frame, bounding_box=None):
         """
@@ -34,6 +36,9 @@ class tracker ():
         self._is_success, self._bounding_box = self.tracker.update(frame.copy())
         self.save_points()
         return self._is_success, self._bounding_box
+
+    def get_bounding_box(self):
+        return self._bounding_box
 
     def save_points(self, ):
         if self._is_success:
