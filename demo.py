@@ -10,15 +10,15 @@ import time
 import argparse
 import cv2
 from sort import Sort
+from visualize import Visualize
 
 def main():
     args = parse_args()
     display = args.display
     use_dlibTracker  = args.use_dlibTracker
     saver = args.saver
-
     writer_open_pose_tracked = skvideo.io.FFmpegWriter(
-               "data/tracked_out.mp4",
+               "/home/payam/project/pytorch_Realtime_Multi-Person_Pose_Estimation/data/tracked_out.mp4",
                 inputdict = {
                     '-r': str(20)
                 },
@@ -36,7 +36,7 @@ def main():
         plt.ion()
         fig = plt.figure()
 
-
+    vis = Visualize()
     if not os.path.exists('output'):
         os.makedirs('output')
     out_file = 'output/townCentreOut.top'
@@ -51,19 +51,24 @@ def main():
         print ("Dlib Correlation tracker activated!")
     else:
         print ("Kalman tracker activated!")
-    video_capture = cv2.VideoCapture("data/PETS09-S2L1.mp4")
+    video_capture = cv2.VideoCapture("/local_home/project/Tracking-with-darkflow/data/AVG-TownCentre.mp4")
+    _, img = video_capture.read()
+    image_shape = img.shape
+    lines = np.zeros(image_shape, np.uint8)
 
     with open(out_file, 'w') as f_out:
 
         while video_capture.isOpened():
             # get detections
 
-
+            people = np.zeros(image_shape, np.uint8)
             total_frames +=1
             # fn = 'test/Pictures%d.jpg' % (frame + 1)  # video frames are extracted to 'test/Pictures%d.jpg' with ffmpeg
             # img = io.imread(fn)
             _, img = video_capture.read()
-            img = cv2.resize(img, (0, 0), fx=1.4, fy=1.4)
+            # img = cv2.resize(img, (0, 0), fx=1.4, fy=1.4)
+            if img is None:
+                break
             canvas, track_list = handle_one(img)
             detections = np.asarray([np.asarray(track.get_bounding_box()) for track in track_list])
             if (display):
@@ -82,13 +87,16 @@ def main():
             total_time += cycle_time
 
             print('frame: %d...took: %3fs'%(total_frames,cycle_time))
-
+            vis.add_points(trackers)
             for d in trackers:
                 f_out.write('%d,%d,%d,%d,x,x,x,x,%.3f,%.3f,%.3f,%.3f\n' % (d[4], total_frames, 1, 1, d[0], d[1], d[2], d[3]))
                 if (display):
                     d = d.astype(np.int32)
+                    lines = vis.draw_line(d[4], lines)
                     ax1.add_patch(patches.Rectangle((d[0], d[1]), d[2] - d[0], d[3] - d[1], fill=False, lw=3,
                                                     ec=colours[d[4] % 32, :]))
+                    vis.rectangle(people, (d[2], d[3]), (d[0], d[1]),d[4])
+                    vis.put_text(people, '%d' % (d[4]), (d[0], d[1]))
                     ax1.set_adjustable('box-forced')
                     #label
                     ax1.annotate('id = %d' % (d[4]), xy=(d[0], d[1]), xytext=(d[0], d[1]))
@@ -96,6 +104,11 @@ def main():
                         ax1.annotate(" DETECTOR", xy=(5, 45), xytext=(5, 45))
 
             if (display):
+                combined = cv2.addWeighted(canvas, 0.4, people, 0.6, 0)
+                combined = cv2.addWeighted(combined, 0.7, lines, 0.3, 0)
+                cv2.imshow("lines", combined)
+                cv2.waitKey(1)
+
                 plt.axis('off')
                 fig.canvas.flush_events()
                 plt.draw()
@@ -107,10 +120,11 @@ def main():
                 cv2.imshow("test", canvas)
                 cv2.waitKey(1)
                 if(saver):
-                    data = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep='')
-                    data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
-                    data = cv2.cvtColor(data, cv2.COLOR_BGR2RGB)
-                    writer_open_pose_tracked.writeFrame(data)
+                    # data = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep='')
+                    # data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+                    # data = cv2.cvtColor(data, cv2.COLOR_BGR2RGB)
+                    combined = cv2.cvtColor(combined, cv2.COLOR_BGR2RGB)
+                    writer_open_pose_tracked.writeFrame(combined)
                 #         fig.savefig("./frameOut/f%d.jpg"%(total_frames+1),dpi = 200)
                 ax1.cla()
     writer_open_pose_tracked.close()
