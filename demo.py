@@ -18,7 +18,7 @@ def main():
     use_dlibTracker  = args.use_dlibTracker
     saver = args.saver
     writer_open_pose_tracked = skvideo.io.FFmpegWriter(
-               "/home/payam/project/pytorch_Realtime_Multi-Person_Pose_Estimation/data/tracked_out.mp4",
+               "/local_home/project/pytorch_Realtime_Multi-Person_Pose_Estimation/data/tracked_out.mp4",
                 inputdict = {
                     '-r': str(20)
                 },
@@ -26,6 +26,15 @@ def main():
                     '-r': str(20)
                 }
             )
+    writer_heat_map = skvideo.io.FFmpegWriter(
+        "data/heat_map.mp4",
+        inputdict={
+            '-r': str(20)
+        },
+        outputdict={
+            '-r': str(20)
+        }
+    )
 
     total_time = 0.0
     total_frames = 0
@@ -51,20 +60,18 @@ def main():
         print ("Dlib Correlation tracker activated!")
     else:
         print ("Kalman tracker activated!")
-    video_capture = cv2.VideoCapture("/local_home/project/Tracking-with-darkflow/data/AVG-TownCentre.mp4")
+    video_capture = cv2.VideoCapture("/local_home/project/pytorch_Realtime_Multi-Person_Pose_Estimation/data/AVG-TownCentre.mp4")
     _, img = video_capture.read()
     image_shape = img.shape
     lines = np.zeros(image_shape, np.uint8)
+    heat_map = np.zeros((image_shape[0], image_shape[1],1), np.uint8)
 
     with open(out_file, 'w') as f_out:
 
         while video_capture.isOpened():
             # get detections
-
             people = np.zeros(image_shape, np.uint8)
             total_frames +=1
-            # fn = 'test/Pictures%d.jpg' % (frame + 1)  # video frames are extracted to 'test/Pictures%d.jpg' with ffmpeg
-            # img = io.imread(fn)
             _, img = video_capture.read()
             # img = cv2.resize(img, (0, 0), fx=1.4, fy=1.4)
             if img is None:
@@ -93,6 +100,7 @@ def main():
                 if (display):
                     d = d.astype(np.int32)
                     lines = vis.draw_line(d[4], lines)
+                    heat_map = vis.heat_map_rectangle(d[4], heat_map)
                     ax1.add_patch(patches.Rectangle((d[0], d[1]), d[2] - d[0], d[3] - d[1], fill=False, lw=3,
                                                     ec=colours[d[4] % 32, :]))
                     vis.rectangle(people, (d[2], d[3]), (d[0], d[1]),d[4])
@@ -105,7 +113,10 @@ def main():
 
             if (display):
                 combined = cv2.addWeighted(canvas, 0.4, people, 0.6, 0)
-                combined = cv2.addWeighted(combined, 0.7, lines, 0.3, 0)
+                im_color = cv2.applyColorMap(heat_map, cv2.COLORMAP_HOT)
+                # combined = cv2.addWeighted(combined, 0.7, lines, 0.3, 0)
+                combined = cv2.addWeighted(combined, 0.5, im_color, 0.5, 0)
+                cv2.imshow("heat_map", im_color)
                 cv2.imshow("lines", combined)
                 cv2.waitKey(1)
 
@@ -157,22 +168,13 @@ if __name__ == '__main__':
 #             '-r': str(20)
 #         }
 #     )
-#     writer_heat_map = skvideo.io.FFmpegWriter(
-#         "data/heat_map.mp4",
-#         inputdict={
-#             '-r': str(20)
-#         },
-#         outputdict={
-#             '-r': str(20)
-#         }
-#     )
+
 #     video_capture = cv2.VideoCapture("output/TownCentreXVID.avi")
 #     # fourcc = cv2.VideoWriter_fourcc(*'XVID')
 #     # out_file = cv2.VideoWriter('',fourcc, 20.0, (360,480))
 #     counter = 22
 #     ret, frame = video_capture.read()
 #     # while True:
-#     heat_map = np.zeros((frame.shape[0], frame.shape[1],1), np.uint8)
 #     # _ = handle_one(np.ones((540,960,3)), heat_map)
 #
 #

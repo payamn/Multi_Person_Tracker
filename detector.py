@@ -31,7 +31,6 @@ torch.set_num_threads(torch.get_num_threads())
 weight_name = './model/pose_model.pth'
 
 # heat map r(in pixel) to generate each point in heat map
-RADIUS = 10
 blocks = {}
 # find connection in the specified sequence, center 29 is in the position 15
 limbSeq = [[2,3], [2,6], [3,4], [4,5], [6,7], [7,8], [2,9], [9,10], \
@@ -148,27 +147,6 @@ model.float()
 model.eval()
 
 param_, model_ = config_reader()
-
-def euclideanDistance(center, point, radius):  # returns a float
-    distance = math.sqrt((float(center[0]) - point[0])**2 + (float(center[1]) - point[1])**2 )
-    if distance > radius:
-        return -1
-    else:
-        return distance
-
-def heat_map_circle(image, point_center):
-    start_point = (max(point_center[0] - RADIUS, 0), max(point_center[1] - RADIUS, 0))
-    end_point = (min(point_center[0] + RADIUS, image.shape[1]-1), min(point_center[1] + RADIUS, image.shape[0]-1))
-    for x in range (start_point[0], end_point[0]+1):
-        for y in range (start_point[1], end_point[1]+1):
-            distance = euclideanDistance(point_center, (x,y), RADIUS)
-            if distance!= -1:
-                if (image[y, x, 0]+((RADIUS-distance)/RADIUS)*200<255):
-                    image[y, x, 0] += ((RADIUS-distance)/RADIUS)*200
-                else:
-                    image[y, x, 0] = 255
-
-    return image
 
 def get_center(point1, point2):
     return tuple([x / 2 for x in map(sum, zip(point1, point2))])
