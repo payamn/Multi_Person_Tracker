@@ -458,7 +458,7 @@ if __name__ == "__main__":
             '-r': str(20)
         }
     )
-    video_capture = cv2.VideoCapture("/local_home/project/pytorch_Realtime_Multi-Person_Pose_Estimation/data/AVG-TownCentre.mp4")
+    video_capture = cv2.VideoCapture("/local_home/project/Tracking-with-darkflow/data/AVG-TownCentre.mp4")
     # fourcc = cv2.VideoWriter_fourcc(*'XVID')
     # out_file = cv2.VideoWriter('',fourcc, 20.0, (360,480))
     counter = 22
